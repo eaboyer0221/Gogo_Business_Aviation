@@ -1,0 +1,343 @@
+
+-- Source Perfman SM Logs
+-- Count: 86449
+Select *
+FROM BA_NETOPS.dbo.history_perfman_service_measurement;
+
+-- Source: Perfman SM_SLA Logs
+-- Count: 72718
+Select *
+FROM BA_NETOPS.dbo.perfman_sm_sla_ba_tails;
+
+---- history_perfman_service_measurement and sm_sla_ba_tails Join
+    -- Full Outer Join Result Count: 86452
+    -- Left Join Results Count: 86449
+    -- Right Join Results Count: 72718
+    -- Inner Join Result Count: 72715
+#FullOuterJoin
+Select * 
+FROM BA_NETOPS.dbo.history_perfman_service_measurement a
+FULL OUTER JOIN BA_NETOPS.dbo.perfman_sm_sla_ba_tails b
+ON a.Report_Period = b.Report_Date 
+    AND a.Tail_Nbr = b.Tail_Nbr
+#LeftJoin
+Select * 
+FROM BA_NETOPS.dbo.history_perfman_service_measurement a
+LEFT JOIN BA_NETOPS.dbo.perfman_sm_sla_ba_tails b
+ON a.Report_Period = b.REPORT_DATE 
+    AND a.Tail_Nbr = b.tail_nbr
+#RightJoin
+Select * 
+FROM BA_NETOPS.dbo.history_perfman_service_measurement a
+RIGHT JOIN BA_NETOPS.dbo.perfman_sm_sla_ba_tails b
+ON a.Report_Period = b.REPORT_DATE 
+    AND a.Tail_Nbr = b.tail_nbr
+    
+      
+
+--Left Join with RMAs table and inner join table, 72841 rows
+Select *
+, row_number() over (partition by Tail_Nbr, Report_Period order by Case_Created_Date DESC) dupfind
+FROM (
+Select a.Tail_Nbr, a.Report_Period, a.Minutes_In_Air, a.SINR, a.MIN_LOW_SINR, a.PERC_LOW_SINR, a.AVG_RX_SM, a.AVG_RF_PER, a.MIN_HIGH_PER, a.PERC_MIN_HIGH_PER, a.AVG_DRC_MBPS, a.MIN_LOW_DRC, a.PERC_MIN_LOW_DRC
+, b.NUM_MINUTES_ASA, b.AVG_ALT, b.MAX_ALTITUDE, b.RTT_AVG, b.TIME_HIGH_LATENCY, b.PERC_TIME_HIGH_LATENCY, b.AIRCARD_TX_POWER, b.MAX_AIRCARD_POWER, b.TIME_LOW_TX_PWR, b.PERC_LOW_PWR, b.AIRCARD_RX_AGC0, b.MAX_AIRCARD_RX_AGC0, b.TIME_LOW_RX_AGC0, b.PERC_LOW_RX_AGC0, b.AIRCARD_RX_AGC1, b.MAX_AIRCARD_RX_AGC1, b.TIME_LOW_RX_AGC1, b.PERC_LOW_RX_AGC1, b.MAX_PASSENGERS, b.MAX_AUTH_PASS, b.AVG_PASSENGER, b.AVG_ACTIVE_PASSENGERS, b.AVG_ACTIVE_UNAUTH_PASS, b.AVG_ACTIVE_ATG_PASS, b.PERC_TIME_IN_THE_EAST
+, c.LAST_5_SERIAL_NBR, c.registration_number
+, d.AIRCRAFT_ID_SF, d.Make, d.Case_Created_Date, d.TOTAL_TICKETS, d.TOTAL_RMA, d.TOTAL_CONFIRMED_FAILURES
+FROM BA_NETOPS.dbo.history_perfman_service_measurement a
+INNER JOIN BA_NETOPS.dbo.perfman_sm_sla_ba_tails b
+ON a.Report_Period = b.Report_Date 
+    AND a.Tail_Nbr = b.Tail_Nbr
+    LEFT JOIN BA_NETOPS.dbo.Table_Match_Emily c
+    ON c.LAST_5_SERIAL_NBR = a.Tail_Nbr
+    LEFT JOIN BA_NETOPS.dbo.All_Aircraft_CasesRMAs d
+    ON a.Report_Period BETWEEN dateadd(day, -7, d.Case_Created_Date) AND d.Case_Created_Date
+      AND d.REGISTRATION_NUMBER = c.REGISTRATION_NUMBER
+      ) subq2
+      
+
+--inner join with RMAs table and inner join table, 504 rows 
+Select * 
+FROM BA_NETOPS.dbo.history_perfman_service_measurement a
+INNER JOIN BA_NETOPS.dbo.perfman_sm_sla_ba_tails b
+ON a.Report_Period = b.Report_Date 
+    AND a.Tail_Nbr = b.Tail_Nbr
+    LEFT JOIN BA_NETOPS.dbo.Table_Match_Emily c
+    ON c.LAST_5_SERIAL_NBR = a.Tail_Nbr
+    INNER JOIN BA_NETOPS.dbo.All_Aircraft_CasesRMAs d
+    ON a.Report_Period = d.Case_Created_Date
+      AND d.REGISTRATION_NUMBER = c.REGISTRATION_NUMBER
+      
+--join with report_periods within 7 days prior to case_created_date - need to try datediff
+Select *
+, row_number() over (partition by Tail_Nbr, Report_Period order by Report_Period) dupfind
+FROM (
+SELECT a.*
+FROM BA_NETOPS.dbo.history_perfman_service_measurement a
+INNER JOIN BA_NETOPS.dbo.perfman_sm_sla_ba_tails b
+ON a.Report_Period = b.Report_Date 
+    AND a.Tail_Nbr = b.Tail_Nbr
+    LEFT JOIN BA_NETOPS.dbo.Table_Match_Emily c
+    ON c.LAST_5_SERIAL_NBR = a.Tail_Nbr
+    INNER JOIN BA_NETOPS.dbo.All_Aircraft_CasesRMAs d
+    ON d.REGISTRATION_NUMBER = c.REGISTRATION_NUMBER
+      WHERE a.Report_Period >= DATEADD(DAY, -7, d.Case_Created_Date)
+        AND a.Report_Period < DATEADD(DAY, 0, d.Case_Created_Date)
+        ) subq1
+        
+
+--table match - map last_five to registration_nbr    
+SELECT
+row_number() over (partition by b.LAST_5_SERIAL_NBR order by b.LAST_5_SERIAL_NBR) dupfind
+, LAST_5_SERIAL_NBR
+, registration_number
+FROM TARGET_REPORTING.dbo.DIM_AIRCRAFT_NAV a
+INNER JOIN TARGET_REPORTING.dbo.DIM_SERVICE_ITEM b
+ON a.aircraft_id_nav = b.aircraft_nbr AND b.ITEM_NBR IN ('p13989', 'P15864-002', 'P15864-001')
+  WHERE a.CURRENT_RECORD_IND = 'y' AND b.CURRENT_RECORD_IND = 'y'
+  
+  
+
+
+
+-- Source SCE Data
+-- Count: 5,254
+Select *
+FROM BA_NETOPS.dbo.Netjets_SCE_Usage_Agg;
+
+-- Source: NetJets
+Select *
+FROM BA_NETOPS.dbo.Netjets_Squawk_FullData a
+WHERE [Disc Desc] = 'WIFI-JIC (WIFI BROADBAND INSTALLATION)'
+
+-- record count: 5061
+Select * 
+FROM BA_NETOPS.dbo.NetJets_GGBiz
+WHERE CAST(FAA_USG_DATE AS DATE) >= '2016-01-02'
+  AND TAIL_NBR IN (Select ATG_Tail_NBR FROM BA_NETOPS.dbo.NetJetsXL_Healthy_Wifi)
+
+Select * 
+FROM BA_NETOPS.dbo.NetJets_gtt
+WHERE CAST(txn_start_time_txt AS DATE) >= '2016-01-02'
+  AND TAIL_NBR IN (Select ATG_Tail_NBR FROM BA_NETOPS.dbo.NetJetsXL_Healthy_Wifi)
+
+-- Left Join SF to SF Results: 166 with 60 mnulls
+-- Left Join Reg to Reg: 166 swith 57 nulls
+
+Select * 
+FROM BA_NETOPS.dbo.NetJetsXL_Healthy_Wifi a
+LEFT JOIN BA_NETOPS.dbo.NetJets_Case_AircraftRollup b
+ -- on a.Aircraft_ID_SF = b.AIRCRAFT_ID_SF
+  on a.Registration_Number = b.REGISTRATION_NUMBER
+
+-- Looking for Closeness in Cases 
+-- Average Closeness: 109.5 days 
+With Main As
+(
+Select ROW_NUMBER() OVER (PARTITION BY Aircraft Order By [Date Discovered]) AS ROW_NUM
+  ,DATEADD(day,-3,[Date Discovered]) AS MINUS_3
+  ,DATEADD(day,3,[Date Discovered]) AS PLUS_3
+  , *
+FROM BA_NETOPS.dbo.Netjets_Squawk_FullData
+ WHERE [Disc Desc] <> 'WIFI-JIC (WIFI BROADBAND INSTALLATION)' AND [Disc Desc] LIKE '%MEL%'
+ ) 
+ Select m1.*, m1.Aircraft, m1.[Date Discovered], m2.[Date Discovered], DATEDIFF(day,m1.[Date Discovered],m2.[Date Discovered]) AS DATE_DIFF
+ FROM Main m1
+ LEFT JOIN Main m2 ON m1.Aircraft = m2.Aircraft and m1.ROW_NUM = m2.ROW_NUM - 1
+ ORDER BY m1.Aircraft, m1.[Date Discovered]
+
+-- Source: EDW
+Select ROW_NUMBER() OVER (PARTITION BY ATG_Tail_Nbr ORDER BY Registration_Number) AS DUP_FIND, *
+FROM BA_NETOPS.dbo.NetJetsXL_Healthy_Wifi
+WHERE Registration_Number in ('N672QS','N678QS','N576QS') OR ATG_Tail_Nbr IN ('10945','11232') OR ATG_Tail_Nbr IS NULL;
+
+-- Start Super Join
+---- Performance and SM_SLA Join
+    -- Full Join Result Count: 5324
+    -- Left Join Results Count: 5324
+    -- Inner Join Result Count: 5175
+---- Adding SCE to Join 
+    -- Full Join Result Count: 5458
+    -- Left Join Result Count: 5324
+    -- Inner Join Result Count: 5120
+---- Adding NetJets Aircraft Info 
+    -- Full Join Result Count: 5338 (Added rows for the null ATG aircraft)
+    -- Left Join Result Count: 5324
+    -- Inner Join Result Count: 5324
+---- Adding NetJets MELs (Fingers Crossed)
+    -- Full Join REsult Count: 5324
+
+-- DROP IT ALL
+--DROP TABLE BA_NETOPS.dbo.NetJets_Part1;
+--DROP TABLE BA_NETOPS.dbo.NetJets_Part2;
+--DROP TABLE BA_NETOPS.dbo.NetJets_Part3;
+--DROP TABLE BA_NETOPS.dbo.NetJets_Part4;
+--DROP TABLE BA_NETOPS.dbo.NetJets_Part5;
+--DROP TABLE BA_NETOPS.dbo.NetJets_Wifi_Love_Final;
+
+-- Create first table joining Performance to SKA
+Select a.*,
+       NUM_MINUTES_ASA,
+       AVG_ALT,
+       MAX_ALTITUDE,
+       RTT_AVG,
+       TIME_HIGH_LATENCY,
+       PERC_TIME_HIGH_LATENCY,
+       AIRCARD_TX_POWER,
+       MAX_AIRCARD_POWER,
+       TIME_LOW_TX_PWR,
+       PERC_LOW_PWR,
+       AIRCARD_RX_AGC0,
+       MAX_AIRCARD_RX_AGC0,
+       TIME_LOW_RX_AGC0,
+       PERC_LOW_RX_AGC0,
+       AIRCARD_RX_AGC1,
+       MAX_AIRCARD_RX_AGC1,
+       TIME_LOW_RX_AGC1,
+       PERC_LOW_RX_AGC1,
+       MAX_PASSENGERS,
+       MAX_AUTH_PASS,
+       AVG_PASSENGER,
+       AVG_ACTIVE_PASSENGERS,
+       AVG_ACTIVE_UNAUTH_PASS,
+       AVG_ACTIVE_ATG_PASS,
+       PERC_TIME_IN_THE_EAST
+INTO  BA_NETOPS.dbo.NetJets_Part1
+FROM BA_NETOPS.dbo.Netjets_Performance_SM a
+LEFT JOIN BA_NETOPS.dbo.Netjets_SM_SLA_Logs b 
+  ON a.Tail_Nbr = b.tail_nbr 
+    and a.Report_Period = b.Report_Date
+
+-- Starting part 2 Joining SCE Data
+Select a.*,
+       Secure_Usage,
+       Streaming_Usage,
+       Voice_and_Video_Usage,
+       Flavors_Usage,
+       CFS_Usage,
+       Browsing_Usage,
+       Other_Usage,
+       Total_Usage_MB
+INTO BA_NETOPS.dbo.NetJets_Part2
+FROM BA_NETOPS.dbo.NetJets_Part1 a
+LEFT JOIN BA_NETOPS.dbo.NetJets_SCE_Usage_Agg c
+  ON a.Report_Period = c.Report_Period 
+    AND a.Tail_Nbr = c.Tail_Nbr
+    
+-- Part 3 Joining Table of Aircraft Details
+Select p2.*
+  , Registration_Number
+  , Make 
+  , Model 
+  , Serial_Number
+  , Aircraft_ID_SF
+  , Aircraft_ID_Nav
+  , Item_NBr
+  , ATG_Type
+  , Installing_Dealer
+INTO BA_NETOPS.dbo.NetJets_Part3
+FROM BA_NETOPS.dbo.NetJets_Part2 p2
+INNER JOIN ( Select ROW_NUMBER() OVER (PARTITION BY ATG_Tail_Nbr ORDER BY Registration_Number) AS DUP_FIND, * FROM BA_NETOPS.dbo.NetJetsXL_Healthy_Wifi ) main
+  ON p2.Tail_Nbr = main.ATG_Tail_Nbr 
+    AND main.Dup_Find = 1
+    
+-- Starting Part 4 Bring in GGBiz
+select p3.*,
+       FIRST_USAGE_DATE,
+       TOTAL_NUMBER_OF_SESSIONS,
+       TOTAL_NUMBER_OF_USAGE_DAYS,
+       FIRST_FLIGHT_DATE,
+       TOTAL_NUMBER_OF_FLIGHTS,
+       TOTAL_NUMBER_OF_FLIGHT_DAYS,
+       FAA_USG_DATE,
+       Count_null_flight_ids,
+       Number_of_Flights,
+       Total_HB_duration,
+       Total_duration_of_availability,
+       Total_heartbeats,
+       Total_outage_minutes,
+       HB_availability_percent,
+       Total_devices,
+       Total_sessions,
+       Total_download,
+       Total_upload,
+       Total_usage,
+       Total_usage_duration
+INTO BA_NETOPS.dbo.NetJets_Part4
+FROM BA_NETOPS.dbo.NetJets_Part3 p3
+LEFT JOIn BA_NETOPS.dbo.NetJets_GGBiz gb
+ON p3.TAIL_NBr = gb.TAIL_NBR AND p3.Report_Period = gb.FAA_USG_DATE AND  CAST(FAA_USG_DATE AS DATE) >= '2016-01-02' AND gb.TAIL_NBR IN (Select ATG_Tail_NBR FROM BA_NETOPS.dbo.NetJetsXL_Healthy_Wifi)
+
+-- Starting Step 5 Bring in Squawks
+Select *
+INTO BA_NETOPS.dbo.NetJets_Part5 
+FROM BA_NETOPS.dbo.NetJets_Part4 p3
+LEFT JOIN 
+  (
+  Select  aircraft
+    ,[Date Discovered]
+    ,[disc Desc]
+    ,max(report_period) LATEST_USAGE_DATE
+  FROM BA_NETOPS.dbo.Netjets_Squawk_FullData fd
+  left join BA_NETOPS.dbo.NetJets_Part4 p3 on fd.Aircraft = p3.Registration_Number AND CAST(fd.[Date Discovered] AS DATE) >= p3.Report_Period
+  group by aircraft,[Date Discovered],[disc Desc]
+  having max(report_period)<= [Date Discovered]
+  ) AS thisone
+ON p3.Registration_Number = thisone.Aircraft AND p3.Report_Period = thisone.Latest_Usage_Date
+
+-- Step 6 Brining in GGTT 
+Select p4.*,
+       Total_registrations,
+       Total_calls,
+       Total_Successful_calls,
+       Total_Seconds,
+       Total_Minutes,
+       Total_texts,
+       Total_Successful_texts
+ INTO BA_NETOPS.dbo.NetJets_Part6 
+FROM BA_NETOPS.dbo.NetJets_Part5 p4
+LEFT JOIN BA_NETOPS.dbo.NetJets_GTT gt 
+  ON p4.Tail_Nbr = gt.TAIL_NBR AND CAST(p4.Report_Period AS DATE) = gt.txn_start_time_txt
+    AND gt.Text_Retry_Ind = 0 and gt.Invalid_GDID = 0
+
+-- Final Step bring in Traffic Shaping and Be Done With It
+select p5.*
+  ,Number_Shaping_Events
+INTO BA_NETOPS.dbo.NetJets_Wifi_Love_Final
+FROM BA_NETOPS.dbo.NetJets_Part6  p5
+LEFT JOIN BA_NETOPS.dbo.Netjets_SCE_Traffic_Shape sts
+  ON p5.TAIL_NBR = sts.TAIL_NBR and p5.Report_Period = sts.Report_Date
+  
+  
+Select *
+FROM BA_NETOPS.dbo.NetJets_Wifi_Love_Final 
+WHERE [Disc Desc] IS NOT NULL 
+
+
+/*
+Select *
+FROM AAA_BH_NEW
+Select * FROM BA_NETOPS.dbo.Netjets_Squawk_FullData WHERE [Date Discovered] >= '2016-01-01' 
+Select ROW_NUMBER() OVER (PARTITION BY TAIL_NBR, Report_Period ORDER BY TAIL_NBR) AS Dup_Find, * 
+FROM (
+Select *
+FROM BA_NETOPS.dbo.NetJets_Part3 a
+LEFT JOIN BA_NETOPS.dbo.Netjets_Squawk_FullData d
+  on a.Registration_Number = d.Aircraft 
+    AND a.Report_Period BETWEEN DATEADD(day,-15,CAST(d.[Date Discovered] AS DATE)) AND DATEADD(day,15,CAST(d.[Date Discovered] AS DATE))
+    AND [Disc Desc] <> 'WIFI-JIC (WIFI BROADBAND INSTALLATION)' 
+    AND [Disc Desc] LIKE '%MEL%'
+      ) as th
+
+Select * 
+FROM BA_NETOPS.dbo.NetJets_Squawk_FullData
+WHERE 1 = 1
+    AND [Disc Desc] <> 'WIFI-JIC (WIFI BROADBAND INSTALLATION)' 
+    AND [Disc Desc] LIKE '%MEL%'
+  
+Select nj.Registration_Number, ns.Aircraft 
+FROM BA_NETOPS.dbo.NetJetsXL_Healthy_Wifi nj
+FULL JOIN (Select distinct Aircraft FROM BA_NETOPS.dbo.Netjets_Squawk_FullData WHERE [Disc Desc] <> 'WIFI-JIC (WIFI BROADBAND INSTALLATION)' ) ns
+  on nj.Registration_Number = ns.Aircraft
+  */
+  
+ 
