@@ -1,0 +1,144 @@
+
+Version   Date      Changed By    Description
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+1.0       -         -             Query created
+1.1       3/4/2016  Emily B       Recode 403 errors as Success, as the analysis of these errors  has shown they are generally cause by the cell phone not being in “airplane mode”.
+
+*/
+select 
+ convert(varchar(10),txn_start_time,112) TXN_START_TIME_TXT
+,case when service in ('Talk','Text') then 1 else 0 end Record_Count
+,case when service in ('Talk','Text') and return_code not in ('408','409','410','482','500','503','504') then 1 else 0 end Successful_Record_Count  -- v 1.1 removed 403 from list
+,case when ca.name = 'ZUNDEFINED' then ct.customer_nbr when ct.gen_bus_posting_group = 'END USER' and ca.gen_bus_posting_group = 'END USER' then ca.customer_nbr when ct.gen_bus_posting_group = 'END USER' then ct.customer_nbr else ca.customer_nbr end Customer_Nbr
+,case when ca.name = 'ZUNDEFINED' then ct.name when ct.gen_bus_posting_group = 'END USER' and ca.gen_bus_posting_group = 'END USER' then ca.name when ct.gen_bus_posting_group = 'END USER' then ct.name	else ca.name end Customer
+,case when ca.name = 'ZUNDEFINED' then ct.gen_bus_posting_group when ct.gen_bus_posting_group = 'END USER' and ca.gen_bus_posting_group = 'END USER' then ca.gen_bus_posting_group when ct.gen_bus_posting_group = 'END USER' then ct.gen_bus_posting_group	else ca.gen_bus_posting_group end Customer_Posting_Group
+,gtt.edw_license_key_id
+,l.license_key
+,l.serial_nbr
+,l.item_nbr License_Item_Nbr
+,case when l.item_nbr = 'P16637-201' then 'Software Entitlement -  Media (UCS)' when l.item_nbr = 'P16637-200' then 'Software Entitlement -  PBX (UCS)' when l.item_nbr = 'P16637-100' then 'Software Entitlement -  Gogo Biz Voice (GGBV)' when l.item_nbr = 'P16637-101' then 'Gogo Text and Talk Entitlement Certificate' when l.item_nbr = 'P16637-102' then 'Gogo Text and Talk Entitlement Certificate  Trial' when l.item_nbr = 'P16637-103' then 'Software Entitlement -  Gogo Biz Voice (Temporary' when l.item_nbr = 'P16637-202' then 'UCS WAN Management Entitlement Certificate' else 'n/a' end License
+,l.acm_serial_nbr
+,l.aircraft_nbr
+,l.aircraft_reg_nbr
+,l.license_start_date
+,l.license_expiration_date
+,l.effective_start_date
+,l.effective_end_date 
+,l.current_record_ind 
+,l.deleted_from_nav_ind
+,l.edw_create_date
+,case when service <> 'Talk' then null when service = 'Talk' and Call_Not_Connected_Ind = 1 then 'Call Not Connected' 
+                    when service = 'Talk' and isnull(datediff(second,call_start_time,call_end_time),0) = 0 then 'Zero Duration' 
+                    when service = 'Talk' and datediff(second,call_start_time,call_end_time) > 0 and datediff(second,call_start_time,call_end_time) <= 15 then '1 to 15 Seconds' 
+                    when service = 'Talk' and datediff(second,call_start_time,call_end_time) > 15 and datediff(second,call_start_time,call_end_time) <= 30 then '15 to 30 Seconds' 
+                    when service = 'Talk' and datediff(second,call_start_time,call_end_time) > 30 and datediff(second,call_start_time,call_end_time) <= 60 then '30 to 60 Seconds' 
+                    when service = 'Talk' and datediff(second,call_start_time,call_end_time) > 60 and datediff(second,call_start_time,call_end_time) <= 180 then '1 to 3 Minutes' 
+                    when service = 'Talk' and datediff(second,call_start_time,call_end_time) > 180 and datediff(second,call_start_time,call_end_time) <= 300 then '3 to 5 Minutes' 
+                    else 'Greater Than 5 Minutes' end call_duration_range
+,'Gogo Text & Talk' product
+,CCDS_Line_Id
+,cpm.corporate_number ccds_corporate_nbr
+,cpm.[corporate_name] ccds_corporate_name
+,cm.customer_number ccds_customer_nbr
+,cm.customer_name ccds_customer_name
+,case when service = 'Talk' and call_start_time is not null then duration else null end duration
+,case when service = 'Text' then TXN_LENGTH else null end characters
+,edw_aircraft_id_nav
+,gtt.Aircraft_Nbr si_aircraft_nbr
+,aircraft_effective_start_date
+,aircraft_effective_end_date
+,Text_Retry_Ind 
+,service
+,direction
+,edw_ggtt_trans_id
+,id
+,txn_id
+,EDW_FACT_GGTT_REGISTRATION_ID edw_fact_ggtt_registration_id
+,BEARER_NAME bearer
+,edw_service_item_id
+,service_item_nbr
+,gtt.Item_Nbr si_item_nbr
+,edw_customer_id_nav
+,account_name si_customer
+,General_Busn_Posting_Group si_posting_group
+,txn_start_time
+,edw_txn_start_id
+,txn_operation
+,result_code
+,return_code
+,gdid
+,gtt.acid
+,ACID_ATTR
+,call_start_time
+,call_end_time
+,call_end_by
+,sub_operation
+,edw_operation_id
+,accuroam_status
+,case when return_code = '403' then 'Success' else DERIVED_STATUS end as status           -- v 1.1 - recode 403 as Success
+,desc_detail
+,XML_DATA
+,XML_MSISDN
+,XML_ACID
+,XML_IOS
+,created_date
+,updated_date
+,carrier
+,user_phone_number
+,inflight_phone
+,remote_id
+,(select min(gt.txn_start_time) First_Date from target_reporting.dbo.FACT_GGTT_TRANSACTION gt inner join target_reporting.dbo.DIM_GTT_OPERATION O on gt.EDW_OPERATION_ID = o.OPERATION_ID where gtt.acid = gt.acid and o.service = 'Talk') First_Call_Date
+,(select min(gt.txn_start_time) First_Date from target_reporting.dbo.FACT_GGTT_TRANSACTION gt inner join target_reporting.dbo.DIM_GTT_OPERATION O on gt.EDW_OPERATION_ID = o.OPERATION_ID where gtt.acid = gt.acid and o.service = 'Text') First_Text_Date
+from (
+SELECT 
+ td.edw_date_id
+,op.service
+,op.route Direction
+--,ac.SELL_TO_ACCT_NAME,  ac.Termination_Date, ac.termination_accuroam_status
+,cust.account_name, cust.General_Busn_Posting_Group
+,isnull(r.lineid,0)  CCDS_Line_Id
+,isnull(r.customerNumber,0) CCDS_CustomerNbr
+--,isnull((select top 1 edw_license_key_id from [TARGET_REPORTING].[dbo].[DIM_LICENSE_KEYS] l where l.item_nbr in ('P16637-101', 'P16637-102') and gtt.acid = l.acid and gtt.txn_start_time >= l.effective_start_date and gtt.txn_start_time <= l.effective_end_date order by l.edw_license_key_id desc),0) edw_license_key_id
+,case when op.SERVICE = 'Talk' and call_start_time is not null then [TXN_LENGTH] else null end duration --Not found
+--,cast(case when op.SERVICE = 'Text' then Txn_Length else null end as int) [TXN_LENGTH] --not found
+,ac.effective_start_date aircraft_effective_start_date, ac.effective_end_date aircraft_effective_end_date
+,case when op.service = 'Talk' then null 
+when (op.service = 'Text' and op.route = 'Ground to Air' and gtt.result_code = 6 and gtt.return_code = 400	and gtt.accuroam_status = 'Bad Request due to malformed syntax') then 'Yes'
+when (op.service = 'Text' and op.route = 'Ground to Air' and gtt.result_code = 8 and gtt.return_code = 480	and gtt.accuroam_status = 'Callee currently unavailable') then 'Yes'
+when (op.service = 'Text' and op.route = 'Ground to Air' and gtt.result_code = 9 and gtt.return_code = 480	and gtt.accuroam_status = 'Callee currently unavailable') then 'Yes'
+when (op.service = 'Text' and op.route = 'Ground to Air' and gtt.result_code = 8 and gtt.return_code = 408	and gtt.accuroam_status = 'Request Timeout - could not find the user in time') then 'Yes'
+when (op.service = 'Text' and op.route = 'Ground to Air' and gtt.result_code = 9 and gtt.return_code = 503	and gtt.accuroam_status = 'Service Unavailable') then 'Yes'
+when (op.service = 'Text' and op.route = 'Ground to Air' and gtt.result_code = 8 and gtt.return_code = 503	and gtt.accuroam_status = 'Service Unavailable') then 'Yes'
+else 'No' end Text_Retry_Ind
+,case when gtt.acid like '0F%' then 'SBB'
+when (gtt.acid is null or gtt.acid in ('none','(null)', 'FFFFFF')) then 'Incompete ACID'  
+when gtt.acid like 'N%' then 'CA' 
+when gtt.acid in ('CATESTAAL', 'CATESTDAL', 'ITHC1', 'ithc2', 'ithc3', 'ITHC4', 'ITHC5', 'ITHC9', 'LT2', 'LT34', 'LT8', 'ORSDM', 'SIT2', 'TSS1', 'TSS1AAL', 'virtualATG', 'WLT1', 'ZACA01','123456', '1234567', '7654321') then 'Test'
+when len(gtt.acid) < 6 then 'Incomplete ACID'
+else 'BA' end ACID_ATTR
+,case when charindex('<msisdn>',replace(xml_data,'"',''),1) + 8 < charindex('</msisdn>',replace(xml_data,'"',''),1) and xml_data is not null then substring(replace(xml_data,'"',''),charindex('<msisdn>',replace(xml_data,'"',''),1) + 8,(charindex('</msisdn>',replace(xml_data,'"',''),1)) - (charindex('<msisdn>',replace(xml_data,'"',''),1) + 8)) else null end XML_MSISDN
+,case when charindex('<acid>',replace(xml_data,'"',''),1) + 6 < charindex('</acid>',replace(xml_data,'"',''),1) and xml_data is not null then substring(replace(xml_data,'"',''),charindex('<acid>',replace(xml_data,'"',''),1) + 6,(charindex('</acid>',replace(xml_data,'"',''),1)) - (charindex('<acid>',replace(xml_data,'"',''),1) + 6)) else null end XML_ACID
+,case when charindex('<uagent>',xml_data,1) <> 0 and charindex('</uagent>',xml_data,1) = 0 then right(xml_data,len(xml_data) - (charindex('<uagent>',xml_data,0) + 8)) when charindex('<uagent>',xml_data,1) <> 0 and charindex('</uagent>',xml_data,1) <> 0 then substring(xml_data,charindex('<uagent>',xml_data,1) + 8,(charindex('</uagent>',xml_data,1)) - (charindex('<uagent>',xml_data,1) + 8))	else null end XML_IOS		
+,case when gtt.desc_detail like '%CallNotConnected%' then 1 else 0 end  Call_Not_Connected_Ind 
+,isnull(reg.CARRIER_NAME, 'UNKNOWN') CARRIER
+,isnull(reg.LS_USER_PHONE,'9999999999') USER_PHONE_NUMBER
+,gtt.*
+from target_reporting.dbo.FACT_GGTT_TRANSACTION GTT
+INNER JOIN target_reporting.dbo.DIM_SERVICE_ITEM SI ON GTT.EDW_Service_Item_ID = SI.EDW_Service_Item_ID
+INNER JOIN target_reporting.dbo.DIM_ITEM ITE ON GTT.EDW_ITEM_ID = ITE.EDW_ITEM_ID
+INNER JOIN target_reporting.dbo.DIM_Customer_NAV CUST ON GTT.EDW_Customer_ID_NAV = CUST.EDW_Customer_ID_NAV
+INNER JOIN target_reporting.dbo.DIM_GTT_OPERATION OP ON GTT.EDW_OPERATION_ID = OP.OPERATION_ID
+INNER JOIN target_reporting.dbo.DIM_AIRCRAFT_NAV AC ON GTT.EDW_Aircraft_ID_NAV = AC.EDW_Aircraft_ID_NAV
+INNER JOIN target_reporting.dbo.DIM_TIME_DIMENSION TD ON GTT.EDW_TXN_START_ID = TD.EDW_DATE_ID
+LEFT JOIN target_reporting.dbo.FACT_GGTT_REGISTRATION REG ON GTT.EDW_FACT_GGTT_REGISTRATION_ID = reg.EDW_FACT_GGTT_REGISTRATION_ID
+LEFT JOIN [ODS_LANDING].[ccds].[LAND_Line] r on (gtt.acid = r.lineNumber and gtt.txn_start_time > r.dateEffective and gtt.TXN_START_TIME < isnull(dateterminated,'9999-12-31 00:00:00') and r.carrierId = 8)
+where gtt.txn_start_time >= DATEADD(mm, DATEDIFF(m,0,getdate())-18,0)
+and gtt.txn_start_time < getdate()
+and op.service in ('Text','Talk')
+) gtt 
+left join [TARGET_REPORTING].[dbo].[DIM_LICENSE_KEYS] l on gtt.edw_license_key_id = l.edw_license_key_id
+left join edw.dbo.customer_address ca on ca.edw_customer_address_id = l.[EDW_CUSTOMER_ID_Per_SI_Table] 
+left join edw.dbo.customer_address ct on l.customer_nbr = ct.customer_nbr 
+left JOIN [ODS_LANDING].[ccds].[LAND_customer_master] cm ON gtt.CCDS_CustomerNbr = cm.[customer_number]
+left join [ODS_LANDING].[ccds].[land_corporate_master] cpm on cm.[corporate_number] = cpm.[corporate_number]
+where acid_attr in ('SBB','BA')
