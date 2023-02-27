@@ -1,2 +1,2 @@
 # Gogo_Business_Aviation
-SQL Queries written as an intern at Gogo Business Aviation.
+Projects completed as Data Analyst Intern at Gogo Business Aviation.
