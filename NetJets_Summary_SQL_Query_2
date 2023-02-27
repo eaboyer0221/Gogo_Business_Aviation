@@ -1,0 +1,27 @@
+WITH netjets AS
+(
+Select * FROM BA_NETOPS.dbo.NetJets_Wifi_Final_With_AGG_Case AS netjets
+), Response AS
+(
+Select RIGHT(fce.Serial_Number,5) AS TAIL_NBR
+  ,air.REGISTRATION_NUMBER
+,CAST(fc.CREATEDDATE AS Date) AS Case_Date
+  ,count(distinct CaseNumber)  AS NUM_CASES
+FROM [PIL-BL-EDW-11].TARGET_REPORTING.dbo.FACT_CASE fc
+LEFT JOIN [PIL-BL-EDW-11].TARGET_REPORTING.dbo.DIM_AIRCRAFT air
+  ON fc.EDW_AIRCRAFT_ID = air.EDW_AIRCRAFT_ID
+LEFT JOIN [PIL-BL-EDW-11].TARGET_REPORTING.dbo.FACT_CASE_EQUIPMENT fce
+  ON fc.ID = fce.Case_ID
+WHERE 1 = 1
+  AND TYPE LIKE '%Trouble%' 
+  AND fc.CURRENT_RECORD_IND = 'Y'
+--  AND ITEM_NBR IN ('P13989','P15864-001','P15864-002')
+  AND fc.CreatedDate >= '2015-01-01'
+  AND  REGISTRATION_NUMBER  IN (Select distinct REGISTRATION_NUMBER FROM BA_NETOPS.dbo.NetJets_Wifi_Final_With_AGG_Case) 
+GROUP BY RIGHT(fce.Serial_Number,5),
+CAST(fc.CREATEDDATE AS Date), air.REGISTRATION_NUMBER
+)
+SELECT * 
+FROM netjets
+  LEFT JOIN Response ON netjets.Tail_Nbr = Response.Tail_Nbr 
+  AND netjets.Report_Period BETWEEN DATEADD(day,-5,Response.Case_Date) AND DATEADD(day,+2,Response.Case_Date)
